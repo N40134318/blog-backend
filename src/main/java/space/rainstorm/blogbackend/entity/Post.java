@@ -4,6 +4,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Column;
+import jakarta.persistence.Lob;
 
 @Entity
 public class Post {
@@ -14,6 +16,8 @@ public class Post {
 
     private String title;
     private String summary;
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
     private String author;
     private String category;

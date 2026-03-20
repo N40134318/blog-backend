@@ -132,7 +132,7 @@ public class PostController {
 
         Post post = new Post();
         post.setTitle(request.getTitle());
-        post.setSummary(request.getContent());
+        post.setSummary(buildSummary(request.getContent()));
         post.setContent(request.getContent());
         post.setAuthor(username);
         post.setCategory(request.getCategory());
@@ -166,7 +166,7 @@ public class PostController {
         }
 
         post.setTitle(request.getTitle());
-        post.setSummary(request.getContent());
+        post.setSummary(buildSummary(request.getContent()));
         post.setContent(request.getContent());
         post.setCategory(request.getCategory());
         post.setTags(request.getTags());
@@ -199,5 +199,22 @@ public class PostController {
 
         postRepository.deleteById(id);
         return ApiResponse.success("删除成功");
+    }
+
+    private String buildSummary(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        String plain = content
+                .replaceAll("```[\\s\\S]*?```", " ")
+                .replaceAll("`([^`]*)`", "$1")
+                .replaceAll("!\\[[^\\]]*\\]\\([^\\)]*\\)", " ")
+                .replaceAll("\\[[^\\]]*\\]\\([^\\)]*\\)", " ")
+                .replaceAll("#{1,6}\\s*", "")
+                .replaceAll("[>*_~\\-]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        return plain.length() > 120 ? plain.substring(0, 120) + "..." : plain;
     }
 }

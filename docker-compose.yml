@@ -1,0 +1,33 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: blog-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: blogdb
+      MYSQL_USER: bloguser
+      MYSQL_PASSWORD: blogpass
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - blog_mysql_data:/var/lib/mysql
+
+  blog-backend-dev:
+    container_name: blog-backend-dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command: ./mvnw spring-boot:run
+    volumes:
+      - .:/workspace
+      - /opt/devplatform/uploads:/app/uploads
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: always
+    depends_on:
+      - mysql
+
+volumes:
+  blog_mysql_data:

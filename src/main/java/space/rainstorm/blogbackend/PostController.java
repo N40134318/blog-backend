@@ -129,17 +129,16 @@ public class PostController {
         }
 
         if (isUnauthorized(auth)) {
-            return new ApiResponse<>(403, "无权限查看该文章", null);
+           return new ApiResponse<>(404, "文章不存在", null);
         }
 
         String username = getCurrentUsername(auth);
         if (!username.equals(post.getAuthor())) {
-            return new ApiResponse<>(403, "无权限查看该文章", null);
+            return new ApiResponse<>(404, "文章不存在", null);
         }
 
         return ApiResponse.success(post);
     }
-
     @PostMapping("/api/posts")
     public ApiResponse<Post> create(
             @RequestHeader(value = "Authorization", required = false) String auth,

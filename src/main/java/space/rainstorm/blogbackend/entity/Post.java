@@ -1,33 +1,35 @@
 package space.rainstorm.blogbackend.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Column;
 import jakarta.persistence.Lob;
 
 @Entity
 public class Post {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String title;
     private String summary;
+
     @Lob
     @Column(columnDefinition = "LONGTEXT")
     private String content;
+
     private String author;
     private String category;
     private String tags;
     private String coverImage;
+    private String status;
 
     public Post() {
     }
 
-    public Post(Long id, String title, String summary, String content, String author, String category, String tags, String coverImage) {
+    public Post(Long id, String title, String summary, String content, String author, String category, String tags, String coverImage, String status) {
         this.id = id;
         this.title = title;
         this.summary = summary;
@@ -36,6 +38,7 @@ public class Post {
         this.category = category;
         this.tags = tags;
         this.coverImage = coverImage;
+        this.status = status;
     }
 
     public Long getId() {
@@ -100,5 +103,13 @@ public class Post {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

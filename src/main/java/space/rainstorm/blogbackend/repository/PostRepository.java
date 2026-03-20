@@ -15,4 +15,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             String author2, String contentKeyword,
             Pageable pageable
     );
+
+    Page<Post> findByStatus(String status, Pageable pageable);
+
+    Page<Post> findByStatusAndTitleContainingOrStatusAndContentContaining(
+            String status1, String titleKeyword,
+            String status2, String contentKeyword,
+            Pageable pageable
+    );
 }

@@ -6,6 +6,7 @@ public class CreatePostRequest {
     private String category;
     private String tags;
     private String coverImage;
+    private String status;
 
     public CreatePostRequest() {
     }
@@ -48,5 +49,13 @@ public class CreatePostRequest {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

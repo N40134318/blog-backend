@@ -42,6 +42,13 @@ public class PostController {
         return JwtUtil.parseUsername(token);
     }
 
+    private String normalizeStatus(String status) {
+        if ("published".equalsIgnoreCase(status)) {
+            return "published";
+        }
+        return "draft";
+    }
+
     @GetMapping("/api/posts")
     public ApiResponse<Map<String, Object>> list(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -49,17 +56,17 @@ public class PostController {
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "") String keyword
     ) {
-        if (isUnauthorized(auth)) {
-            return new ApiResponse<>(401, "未登录", null);
-        }
-
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         Page<Post> result;
 
         if (keyword == null || keyword.isBlank()) {
-            result = postRepository.findAll(pageable);
+            result = postRepository.findByStatus("published", pageable);
         } else {
-            result = postRepository.findByTitleContainingOrContentContaining(keyword, keyword, pageable);
+            result = postRepository.findByStatusAndTitleContainingOrStatusAndContentContaining(
+                    "published", keyword,
+                    "published", keyword,
+                    pageable
+            );
         }
 
         return ApiResponse.success(Map.of(
@@ -110,13 +117,27 @@ public class PostController {
             @PathVariable Long id,
             @RequestHeader(value = "Authorization", required = false) String auth
     ) {
-        if (isUnauthorized(auth)) {
-            return new ApiResponse<>(401, "未登录", null);
+        Optional<Post> optionalPost = postRepository.findById(id);
+        if (optionalPost.isEmpty()) {
+            return new ApiResponse<>(404, "文章不存在", null);
         }
 
-        Optional<Post> post = postRepository.findById(id);
-        return post.map(ApiResponse::success)
-                .orElseGet(() -> new ApiResponse<>(404, "文章不存在", null));
+        Post post = optionalPost.get();
+
+        if ("published".equals(post.getStatus())) {
+            return ApiResponse.success(post);
+        }
+
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(403, "无权限查看该文章", null);
+        }
+
+        String username = getCurrentUsername(auth);
+        if (!username.equals(post.getAuthor())) {
+            return new ApiResponse<>(403, "无权限查看该文章", null);
+        }
+
+        return ApiResponse.success(post);
     }
 
     @PostMapping("/api/posts")
@@ -138,6 +159,7 @@ public class PostController {
         post.setCategory(request.getCategory());
         post.setTags(request.getTags());
         post.setCoverImage(request.getCoverImage());
+        post.setStatus(normalizeStatus(request.getStatus()));
 
         return ApiResponse.success(postRepository.save(post));
     }
@@ -160,7 +182,6 @@ public class PostController {
         }
 
         Post post = optionalPost.get();
-
         if (!username.equals(post.getAuthor())) {
             return new ApiResponse<>(403, "无权限修改别人的文章", null);
         }
@@ -171,6 +192,7 @@ public class PostController {
         post.setCategory(request.getCategory());
         post.setTags(request.getTags());
         post.setCoverImage(request.getCoverImage());
+        post.setStatus(normalizeStatus(request.getStatus()));
 
         return ApiResponse.success(postRepository.save(post));
     }
@@ -192,7 +214,6 @@ public class PostController {
         }
 
         Post post = optionalPost.get();
-
         if (!username.equals(post.getAuthor())) {
             return new ApiResponse<>(403, "无权限删除别人的文章", null);
         }
@@ -205,6 +226,7 @@ public class PostController {
         if (content == null || content.isBlank()) {
             return "";
         }
+
         String plain = content
                 .replaceAll("```[\\s\\S]*?```", " ")
                 .replaceAll("`([^`]*)`", "$1")

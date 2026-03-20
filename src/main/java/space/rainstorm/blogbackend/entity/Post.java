@@ -26,10 +26,13 @@ public class Post {
     private String coverImage;
     private String status;
 
+    private Long createdAt;
+    private Long updatedAt;
+
     public Post() {
     }
 
-    public Post(Long id, String title, String summary, String content, String author, String category, String tags, String coverImage, String status) {
+    public Post(Long id, String title, String summary, String content, String author, String category, String tags, String coverImage, String status, Long createdAt, Long updatedAt) {
         this.id = id;
         this.title = title;
         this.summary = summary;
@@ -39,6 +42,8 @@ public class Post {
         this.tags = tags;
         this.coverImage = coverImage;
         this.status = status;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public Long getId() {
@@ -111,5 +116,21 @@ public class Post {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Long updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

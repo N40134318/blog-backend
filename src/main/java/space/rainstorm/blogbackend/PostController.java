@@ -129,7 +129,7 @@ public class PostController {
         }
 
         if (isUnauthorized(auth)) {
-           return new ApiResponse<>(404, "文章不存在", null);
+            return new ApiResponse<>(404, "文章不存在", null);
         }
 
         String username = getCurrentUsername(auth);
@@ -139,6 +139,7 @@ public class PostController {
 
         return ApiResponse.success(post);
     }
+
     @PostMapping("/api/posts")
     public ApiResponse<Post> create(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -149,6 +150,7 @@ public class PostController {
         }
 
         String username = getCurrentUsername(auth);
+        long now = System.currentTimeMillis();
 
         Post post = new Post();
         post.setTitle(request.getTitle());
@@ -159,6 +161,8 @@ public class PostController {
         post.setTags(request.getTags());
         post.setCoverImage(request.getCoverImage());
         post.setStatus(normalizeStatus(request.getStatus()));
+        post.setCreatedAt(now);
+        post.setUpdatedAt(now);
 
         return ApiResponse.success(postRepository.save(post));
     }
@@ -192,6 +196,7 @@ public class PostController {
         post.setTags(request.getTags());
         post.setCoverImage(request.getCoverImage());
         post.setStatus(normalizeStatus(request.getStatus()));
+        post.setUpdatedAt(System.currentTimeMillis());
 
         return ApiResponse.success(postRepository.save(post));
     }

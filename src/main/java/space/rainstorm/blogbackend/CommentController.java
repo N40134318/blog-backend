@@ -1,5 +1,6 @@
 package space.rainstorm.blogbackend;
 
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,7 +33,6 @@ public class CommentController {
         if (auth == null || !auth.startsWith("Bearer ")) {
             return true;
         }
-
         String token = auth.replace("Bearer ", "");
         return !JwtUtil.isValid(token);
     }
@@ -62,7 +62,7 @@ public class CommentController {
     public ApiResponse<Comment> create(
             @PathVariable Long postId,
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @RequestBody CreateCommentRequest request
+            @Valid @RequestBody CreateCommentRequest request
     ) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
@@ -72,16 +72,12 @@ public class CommentController {
             return new ApiResponse<>(404, "文章不存在", null);
         }
 
-        if (request.getContent() == null || request.getContent().isBlank()) {
-            return new ApiResponse<>(400, "评论内容不能为空", null);
-        }
-
         String username = getCurrentUsername(auth);
 
         Comment comment = new Comment();
         comment.setPostId(postId);
         comment.setAuthor(username);
-        comment.setContent(request.getContent());
+        comment.setContent(request.getContent().trim());
         comment.setCreatedAt(System.currentTimeMillis());
 
         return ApiResponse.success(commentRepository.save(comment));

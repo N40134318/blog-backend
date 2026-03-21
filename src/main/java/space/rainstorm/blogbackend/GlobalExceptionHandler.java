@@ -1,5 +1,6 @@
 package space.rainstorm.blogbackend;
 
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -8,6 +9,18 @@ import space.rainstorm.blogbackend.common.ApiResponse;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ApiResponse<String> handleValidationException(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage())
+                .orElse("请求参数不合法");
+
+        return new ApiResponse<>(400, message, null);
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResponse<String> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
         return new ApiResponse<>(400, "上传文件不能超过 10MB", null);
@@ -15,6 +28,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ApiResponse<String> handleException(Exception e) {
-        return new ApiResponse<>(500, "服务器内部错误：" + e.getMessage(), null);
+        return new ApiResponse<>(500, "服务器内部错误", null);
     }
 }

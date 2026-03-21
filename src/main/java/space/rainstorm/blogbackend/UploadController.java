@@ -9,12 +9,26 @@ import space.rainstorm.blogbackend.util.JwtUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 public class UploadController {
 
     private static final String UPLOAD_DIR = "/app/uploads";
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/png",
+            "image/jpeg",
+            "image/webp"
+    );
+
+    private static final Set<String> ALLOWED_SUFFIXES = Set.of(
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp"
+    );
 
     private boolean isUnauthorized(String auth) {
         if (auth == null || !auth.startsWith("Bearer ")) {
@@ -37,38 +51,41 @@ public class UploadController {
             return new ApiResponse<>(400, "文件不能为空", null);
         }
 
-        String contentType = file.getContentType();
-        if (contentType == null ||
-                (!contentType.equals("image/png") &&
-                 !contentType.equals("image/jpeg") &&
-                 !contentType.equals("image/jpg") &&
-                 !contentType.equals("image/webp"))) {
-            return new ApiResponse<>(400, "只允许上传 png/jpg/jpeg/webp 图片", null);
-        }
-
-        long maxSize = 10 * 1024 * 1024L; // 10MB
+        long maxSize = 10 * 1024 * 1024L;
         if (file.getSize() > maxSize) {
             return new ApiResponse<>(400, "图片不能超过 10MB", null);
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String suffix = "";
-
-        if (originalFilename != null && originalFilename.contains(".")) {
-            suffix = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            return new ApiResponse<>(400, "只允许上传 png/jpg/jpeg/webp 图片", null);
         }
 
-        if (!(suffix.equals(".png") || suffix.equals(".jpg") || suffix.equals(".jpeg") || suffix.equals(".webp"))) {
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return new ApiResponse<>(400, "文件名无效", null);
+        }
+
+        String safeFilename = originalFilename.trim().replace("\\", "/");
+        String suffix = "";
+
+        int lastDotIndex = safeFilename.lastIndexOf(".");
+        if (lastDotIndex >= 0) {
+            suffix = safeFilename.substring(lastDotIndex).toLowerCase();
+        }
+
+        if (!ALLOWED_SUFFIXES.contains(suffix)) {
             return new ApiResponse<>(400, "文件后缀仅支持 png/jpg/jpeg/webp", null);
         }
 
         File uploadDir = new File(UPLOAD_DIR);
-        if (!uploadDir.exists()) {
-            uploadDir.mkdirs();
+        if (!uploadDir.exists() && !uploadDir.mkdirs()) {
+            return new ApiResponse<>(500, "上传目录创建失败", null);
         }
 
         String filename = UUID.randomUUID() + suffix;
         File dest = new File(uploadDir, filename);
+
         file.transferTo(dest);
 
         String url = "https://dev.rainstorm.space/uploads/" + filename;

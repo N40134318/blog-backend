@@ -1,5 +1,6 @@
 package space.rainstorm.blogbackend;
 
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 @RestController
 public class PostController {
+
     private final PostRepository postRepository;
 
     public PostController(PostRepository postRepository) {
@@ -47,6 +49,10 @@ public class PostController {
             return "published";
         }
         return "draft";
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? null : value.trim();
     }
 
     @GetMapping("/api/posts")
@@ -143,7 +149,7 @@ public class PostController {
     @PostMapping("/api/posts")
     public ApiResponse<Post> create(
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @RequestBody CreatePostRequest request
+            @Valid @RequestBody CreatePostRequest request
     ) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
@@ -153,13 +159,13 @@ public class PostController {
         long now = System.currentTimeMillis();
 
         Post post = new Post();
-        post.setTitle(request.getTitle());
+        post.setTitle(request.getTitle().trim());
         post.setSummary(buildSummary(request.getContent()));
-        post.setContent(request.getContent());
+        post.setContent(request.getContent().trim());
         post.setAuthor(username);
-        post.setCategory(request.getCategory());
-        post.setTags(request.getTags());
-        post.setCoverImage(request.getCoverImage());
+        post.setCategory(normalizeText(request.getCategory()));
+        post.setTags(normalizeText(request.getTags()));
+        post.setCoverImage(normalizeText(request.getCoverImage()));
         post.setStatus(normalizeStatus(request.getStatus()));
         post.setCreatedAt(now);
         post.setUpdatedAt(now);
@@ -171,7 +177,7 @@ public class PostController {
     public ApiResponse<Post> update(
             @PathVariable Long id,
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @RequestBody CreatePostRequest request
+            @Valid @RequestBody CreatePostRequest request
     ) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
@@ -179,7 +185,6 @@ public class PostController {
 
         String username = getCurrentUsername(auth);
         Optional<Post> optionalPost = postRepository.findById(id);
-
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
@@ -189,12 +194,12 @@ public class PostController {
             return new ApiResponse<>(403, "无权限修改别人的文章", null);
         }
 
-        post.setTitle(request.getTitle());
+        post.setTitle(request.getTitle().trim());
         post.setSummary(buildSummary(request.getContent()));
-        post.setContent(request.getContent());
-        post.setCategory(request.getCategory());
-        post.setTags(request.getTags());
-        post.setCoverImage(request.getCoverImage());
+        post.setContent(request.getContent().trim());
+        post.setCategory(normalizeText(request.getCategory()));
+        post.setTags(normalizeText(request.getTags()));
+        post.setCoverImage(normalizeText(request.getCoverImage()));
         post.setStatus(normalizeStatus(request.getStatus()));
         post.setUpdatedAt(System.currentTimeMillis());
 
@@ -212,7 +217,6 @@ public class PostController {
 
         String username = getCurrentUsername(auth);
         Optional<Post> optionalPost = postRepository.findById(id);
-
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
         }

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import space.rainstorm.blogbackend.common.ApiResponse;
 
 @RestControllerAdvice
@@ -55,18 +56,25 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(code, message, null));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handleNoResourceFoundException(NoResourceFoundException e) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(404, "资源不存在", null));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<String>> handleException(Exception e) {
         System.out.println(">>> GLOBAL EXCEPTION HANDLER TRIGGERED <<<");
         e.printStackTrace();
 
-        String message = e.getClass().getSimpleName();
-        if (e.getMessage() != null && !e.getMessage().isBlank()) {
-            message += ": " + e.getMessage();
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "未知异常";
         }
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiResponse<>(500, "服务器内部错误 - " + message, null));
+                .body(new ApiResponse<>(500, "服务器内部错误: " + message, null));
     }
 }

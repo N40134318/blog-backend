@@ -7,21 +7,24 @@ import jakarta.persistence.Id;
 
 @Entity
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String username;
+
     private String password;
+
+    private Integer tokenVersion = 0;
 
     public User() {
     }
 
-    public User(Long id, String username, String password) {
+    public User(Long id, String username, String password, Integer tokenVersion) {
         this.id = id;
         this.username = username;
         this.password = password;
+        this.tokenVersion = tokenVersion;
     }
 
     public Long getId() {
@@ -46,5 +49,13 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 }

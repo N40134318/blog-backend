@@ -18,6 +18,7 @@ import space.rainstorm.blogbackend.dto.CreatePostRequest;
 import space.rainstorm.blogbackend.entity.Post;
 import space.rainstorm.blogbackend.repository.PostRepository;
 import space.rainstorm.blogbackend.util.JwtUtil;
+import space.rainstorm.blogbackend.dto.UpdatePostStatusRequest;
 
 import java.util.Map;
 import java.util.Optional;
@@ -203,6 +204,35 @@ public class PostController {
         post.setStatus(normalizeStatus(request.getStatus()));
         post.setUpdatedAt(System.currentTimeMillis());
 
+        return ApiResponse.success(postRepository.save(post));
+    }
+
+    @PutMapping("/api/posts/{id}/status")
+    public ApiResponse<Post> updateStatus(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @Valid @RequestBody UpdatePostStatusRequest request
+    ) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+    
+        String username = getCurrentUsername(auth);
+        Optional<Post> optionalPost = postRepository.findById(id);
+
+        if (optionalPost.isEmpty()) {
+            return new ApiResponse<>(404, "文章不存在", null);
+        }
+
+        Post post = optionalPost.get();
+
+        if (!username.equals(post.getAuthor())) {
+            return new ApiResponse<>(403, "无权限修改别人的文章状态", null);
+        }
+
+        post.setStatus(normalizeStatus(request.getStatus()));
+        post.setUpdatedAt(System.currentTimeMillis());
+    
         return ApiResponse.success(postRepository.save(post));
     }
 

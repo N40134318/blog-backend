@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 
 @Entity
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -15,15 +16,19 @@ public class User {
 
     private String password;
 
+    // ✅ 新增：角色（admin / user）
+    private String role = "user";
+
     private Integer tokenVersion = 0;
 
     public User() {
     }
 
-    public User(Long id, String username, String password, Integer tokenVersion) {
+    public User(Long id, String username, String password, String role, Integer tokenVersion) {
         this.id = id;
         this.username = username;
         this.password = password;
+        this.role = role;
         this.tokenVersion = tokenVersion;
     }
 
@@ -49,6 +54,15 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    // ✅ 新增 getter / setter
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public Integer getTokenVersion() {

@@ -6,21 +6,27 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import space.rainstorm.blogbackend.entity.Post;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
+
     Page<Post> findByAuthor(String author, Pageable pageable);
 
-    Page<Post> findByTitleContainingOrContentContaining(String titleKeyword, String contentKeyword, Pageable pageable);
+    Page<Post> findByTitleContainingOrContentContaining(
+            String titleKeyword,
+            String contentKeyword,
+            Pageable pageable);
 
     Page<Post> findByAuthorAndTitleContainingOrAuthorAndContentContaining(
             String author1, String titleKeyword,
             String author2, String contentKeyword,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     Page<Post> findByStatus(String status, Pageable pageable);
 
     Page<Post> findByStatusAndTitleContainingOrStatusAndContentContaining(
             String status1, String titleKeyword,
             String status2, String contentKeyword,
-            Pageable pageable
-    );
+            Pageable pageable);
+
+    long countByStatus(String status);
+
+    long count();
 }

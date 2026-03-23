@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import space.rainstorm.blogbackend.common.ApiResponse;
 import space.rainstorm.blogbackend.dto.CreatePostRequest;
-import space.rainstorm.blogbackend.entity.Post;
-import space.rainstorm.blogbackend.repository.PostRepository;
-import space.rainstorm.blogbackend.util.JwtUtil;
 import space.rainstorm.blogbackend.dto.UpdatePostStatusRequest;
+import space.rainstorm.blogbackend.entity.Post;
+import space.rainstorm.blogbackend.entity.User;
+import space.rainstorm.blogbackend.repository.PostRepository;
+import space.rainstorm.blogbackend.repository.UserRepository;
+import space.rainstorm.blogbackend.util.JwtUtil;
 
 import java.util.Map;
 import java.util.Optional;
@@ -27,9 +29,11 @@ import java.util.Optional;
 public class PostController {
 
     private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
-    public PostController(PostRepository postRepository) {
+    public PostController(PostRepository postRepository, UserRepository userRepository) {
         this.postRepository = postRepository;
+        this.userRepository = userRepository;
     }
 
     private boolean isUnauthorized(String auth) {
@@ -43,6 +47,33 @@ public class PostController {
     private String getCurrentUsername(String auth) {
         String token = auth.replace("Bearer ", "");
         return JwtUtil.parseUsername(token);
+    }
+
+    private User getCurrentUser(String auth) {
+        if (isUnauthorized(auth)) {
+            return null;
+        }
+        String username = getCurrentUsername(auth);
+        return userRepository.findByUsername(username);
+    }
+
+    private boolean isAdmin(String auth) {
+        User user = getCurrentUser(auth);
+        if (user == null || user.getRole() == null) {
+            return false;
+        }
+        return "admin".equalsIgnoreCase(user.getRole());
+    }
+
+    private boolean canManagePost(String auth, Post post) {
+        if (post == null || isUnauthorized(auth)) {
+            return false;
+        }
+        if (isAdmin(auth)) {
+            return true;
+        }
+        String username = getCurrentUsername(auth);
+        return username.equals(post.getAuthor());
     }
 
     private String normalizeStatus(String status) {
@@ -61,8 +92,7 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "") String keyword
-    ) {
+            @RequestParam(defaultValue = "") String keyword) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         Page<Post> result;
 
@@ -72,8 +102,7 @@ public class PostController {
             result = postRepository.findByStatusAndTitleContainingOrStatusAndContentContaining(
                     "published", keyword,
                     "published", keyword,
-                    pageable
-            );
+                    pageable);
         }
 
         return ApiResponse.success(Map.of(
@@ -81,8 +110,7 @@ public class PostController {
                 "page", result.getNumber(),
                 "size", result.getSize(),
                 "totalElements", result.getTotalElements(),
-                "totalPages", result.getTotalPages()
-        ));
+                "totalPages", result.getTotalPages()));
     }
 
     @GetMapping("/api/posts/my")
@@ -90,8 +118,7 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "") String keyword
-    ) {
+            @RequestParam(defaultValue = "") String keyword) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
@@ -106,8 +133,7 @@ public class PostController {
             result = postRepository.findByAuthorAndTitleContainingOrAuthorAndContentContaining(
                     username, keyword,
                     username, keyword,
-                    pageable
-            );
+                    pageable);
         }
 
         return ApiResponse.success(Map.of(
@@ -115,15 +141,72 @@ public class PostController {
                 "page", result.getNumber(),
                 "size", result.getSize(),
                 "totalElements", result.getTotalElements(),
-                "totalPages", result.getTotalPages()
-        ));
+                "totalPages", result.getTotalPages()));
+    }
+
+    @GetMapping("/api/admin/posts")
+    public ApiResponse<Map<String, Object>> adminPosts(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "") String keyword) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+
+        if (!isAdmin(auth)) {
+            return new ApiResponse<>(403, "仅管理员可访问", null);
+        }
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        Page<Post> result;
+
+        if (keyword == null || keyword.isBlank()) {
+            result = postRepository.findAll(pageable);
+        } else {
+            result = postRepository.findByTitleContainingOrContentContaining(
+                    keyword,
+                    keyword,
+                    pageable);
+        }
+
+        return ApiResponse.success(Map.of(
+                "list", result.getContent(),
+                "page", result.getNumber(),
+                "size", result.getSize(),
+                "totalElements", result.getTotalElements(),
+                "totalPages", result.getTotalPages()));
+    }
+
+    @GetMapping("/api/admin/dashboard")
+    public ApiResponse<Map<String, Object>> adminDashboard(
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+
+        if (!isAdmin(auth)) {
+            return new ApiResponse<>(403, "仅管理员可访问", null);
+        }
+
+        PageRequest pageable = PageRequest.of(0, 6, Sort.by(Sort.Direction.DESC, "id"));
+        Page<Post> recentPage = postRepository.findAll(pageable);
+
+        long totalPosts = postRepository.count();
+        long draftCount = postRepository.countByStatus("draft");
+        long publishedCount = postRepository.countByStatus("published");
+
+        return ApiResponse.success(Map.of(
+                "totalPosts", totalPosts,
+                "draftCount", draftCount,
+                "publishedCount", publishedCount,
+                "recentPosts", recentPage.getContent()));
     }
 
     @GetMapping("/api/posts/{id}")
     public ApiResponse<Post> detail(
             @PathVariable Long id,
-            @RequestHeader(value = "Authorization", required = false) String auth
-    ) {
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         Optional<Post> optionalPost = postRepository.findById(id);
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
@@ -135,12 +218,7 @@ public class PostController {
             return ApiResponse.success(post);
         }
 
-        if (isUnauthorized(auth)) {
-            return new ApiResponse<>(404, "文章不存在", null);
-        }
-
-        String username = getCurrentUsername(auth);
-        if (!username.equals(post.getAuthor())) {
+        if (!canManagePost(auth, post)) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
 
@@ -150,8 +228,7 @@ public class PostController {
     @PostMapping("/api/posts")
     public ApiResponse<Post> create(
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @Valid @RequestBody CreatePostRequest request
-    ) {
+            @Valid @RequestBody CreatePostRequest request) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
@@ -178,21 +255,20 @@ public class PostController {
     public ApiResponse<Post> update(
             @PathVariable Long id,
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @Valid @RequestBody CreatePostRequest request
-    ) {
+            @Valid @RequestBody CreatePostRequest request) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
 
-        String username = getCurrentUsername(auth);
         Optional<Post> optionalPost = postRepository.findById(id);
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
 
         Post post = optionalPost.get();
-        if (!username.equals(post.getAuthor())) {
-            return new ApiResponse<>(403, "无权限修改别人的文章", null);
+
+        if (!canManagePost(auth, post)) {
+            return new ApiResponse<>(403, "无权限修改这篇文章", null);
         }
 
         post.setTitle(request.getTitle().trim());
@@ -211,49 +287,45 @@ public class PostController {
     public ApiResponse<Post> updateStatus(
             @PathVariable Long id,
             @RequestHeader(value = "Authorization", required = false) String auth,
-            @Valid @RequestBody UpdatePostStatusRequest request
-    ) {
+            @Valid @RequestBody UpdatePostStatusRequest request) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
-    
-        String username = getCurrentUsername(auth);
-        Optional<Post> optionalPost = postRepository.findById(id);
 
+        Optional<Post> optionalPost = postRepository.findById(id);
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
 
         Post post = optionalPost.get();
 
-        if (!username.equals(post.getAuthor())) {
-            return new ApiResponse<>(403, "无权限修改别人的文章状态", null);
+        if (!canManagePost(auth, post)) {
+            return new ApiResponse<>(403, "无权限修改这篇文章状态", null);
         }
 
         post.setStatus(normalizeStatus(request.getStatus()));
         post.setUpdatedAt(System.currentTimeMillis());
-    
+
         return ApiResponse.success(postRepository.save(post));
     }
 
     @DeleteMapping("/api/posts/{id}")
     public ApiResponse<String> delete(
             @PathVariable Long id,
-            @RequestHeader(value = "Authorization", required = false) String auth
-    ) {
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
 
-        String username = getCurrentUsername(auth);
         Optional<Post> optionalPost = postRepository.findById(id);
         if (optionalPost.isEmpty()) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
 
         Post post = optionalPost.get();
-        if (!username.equals(post.getAuthor())) {
-            return new ApiResponse<>(403, "无权限删除别人的文章", null);
+
+        if (!canManagePost(auth, post)) {
+            return new ApiResponse<>(403, "无权限删除这篇文章", null);
         }
 
         postRepository.deleteById(id);

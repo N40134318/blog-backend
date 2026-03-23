@@ -30,7 +30,6 @@ public class AuthController {
 
     private static final int LOGIN_LIMIT = 10;
     private static final long LOGIN_WINDOW_MILLIS = 60 * 1000L;
-
     private static final int REGISTER_LIMIT = 3;
     private static final long REGISTER_WINDOW_MILLIS = 10 * 60 * 1000L;
 
@@ -52,6 +51,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Map<String, String>>> register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpServletRequest) {
+
         String ip = getClientIp(httpServletRequest);
         String registerKey = "register:" + ip;
 
@@ -83,19 +83,22 @@ public class AuthController {
         User user = new User();
         user.setUsername(username);
         user.setPassword(encodedPassword);
+        user.setRole("user"); // ✅ 默认注册用户角色
         user.setTokenVersion(0);
 
         userRepository.save(user);
 
         return ResponseEntity.ok(
                 ApiResponse.success(Map.of(
-                        "username", user.getUsername())));
+                        "username", user.getUsername(),
+                        "role", user.getRole())));
     }
 
     @PostMapping("/api/login")
     public ResponseEntity<ApiResponse<Map<String, String>>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpServletRequest) {
+
         String username = request.getUsername().trim();
         String ip = getClientIp(httpServletRequest);
         String loginRateKey = "login:" + ip;
@@ -108,6 +111,7 @@ public class AuthController {
         }
 
         String attemptKey = username + "@" + ip;
+
         if (loginAttemptService.isLocked(attemptKey)) {
             long seconds = loginAttemptService.getRemainingLockSeconds(attemptKey);
             throw new ResponseStatusException(
@@ -116,6 +120,7 @@ public class AuthController {
         }
 
         User user = userRepository.findByUsername(username);
+
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             loginAttemptService.recordFail(attemptKey);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
@@ -124,18 +129,22 @@ public class AuthController {
         loginAttemptService.reset(attemptKey);
 
         Integer tokenVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        String role = user.getRole() == null || user.getRole().isBlank() ? "user" : user.getRole();
+
         String accessToken = JwtUtil.generateAccessToken(user.getUsername());
         String refreshToken = JwtUtil.generateRefreshToken(user.getUsername(), tokenVersion);
 
         return ResponseEntity.ok(
                 ApiResponse.success(Map.of(
                         "accessToken", accessToken,
-                        "refreshToken", refreshToken)));
+                        "refreshToken", refreshToken,
+                        "role", role)));
     }
 
     @PostMapping("/api/refresh")
     public ResponseEntity<ApiResponse<Map<String, String>>> refresh(
             @Valid @RequestBody RefreshTokenRequest request) {
+
         String refreshToken = request.getRefreshToken();
 
         if (!JwtUtil.isRefreshTokenValid(refreshToken)) {
@@ -155,18 +164,22 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refreshToken已失效，请重新登录");
         }
 
+        String role = user.getRole() == null || user.getRole().isBlank() ? "user" : user.getRole();
+
         String newAccessToken = JwtUtil.generateAccessToken(username);
         String newRefreshToken = JwtUtil.generateRefreshToken(username, currentTokenVersion);
 
         return ResponseEntity.ok(
                 ApiResponse.success(Map.of(
                         "accessToken", newAccessToken,
-                        "refreshToken", newRefreshToken)));
+                        "refreshToken", newRefreshToken,
+                        "role", role)));
     }
 
     @GetMapping("/api/auth/me")
     public ResponseEntity<ApiResponse<Map<String, String>>> me(
             @RequestHeader(value = "Authorization", required = false) String auth) {
+
         if (auth == null || !auth.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未登录");
         }
@@ -179,14 +192,23 @@ public class AuthController {
 
         String username = JwtUtil.parseUsername(token);
 
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
+        }
+
+        String role = user.getRole() == null || user.getRole().isBlank() ? "user" : user.getRole();
+
         return ResponseEntity.ok(
                 ApiResponse.success(Map.of(
-                        "username", username)));
+                        "username", username,
+                        "role", role)));
     }
 
     @PostMapping("/api/logout")
     public ResponseEntity<ApiResponse<Map<String, String>>> logout(
             @RequestHeader(value = "Authorization", required = false) String auth) {
+
         if (auth == null || !auth.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未登录");
         }
@@ -198,8 +220,8 @@ public class AuthController {
         }
 
         String username = JwtUtil.parseUsername(token);
-        User user = userRepository.findByUsername(username);
 
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
         }

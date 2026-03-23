@@ -33,3 +33,6 @@ uploads/
 
 # OS
 .DS_Store
+
+#测试脚本
+*.sh

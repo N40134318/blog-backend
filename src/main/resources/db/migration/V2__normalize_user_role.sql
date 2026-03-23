@@ -1,0 +1,9 @@
+ALTER TABLE user
+    MODIFY COLUMN role VARCHAR(50) NULL;
+
+UPDATE user
+SET role = 'user'
+WHERE role IS NULL OR TRIM(role) = '';
+
+ALTER TABLE user
+    MODIFY COLUMN role VARCHAR(50) NOT NULL DEFAULT 'user';

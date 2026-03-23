@@ -9,11 +9,11 @@ import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    List<Comment> findByPostIdOrderByIdDesc(Long postId);
+    List<Comment> findByPostIdAndStatusOrderByIdDesc(Long postId, String status);
 
     Page<Comment> findAllByOrderByIdDesc(Pageable pageable);
 
-    Page<Comment> findByAuthorContainingOrContentContaining(
+    Page<Comment> findByAuthorContainingOrContentContainingOrderByIdDesc(
             String authorKeyword,
             String contentKeyword,
             Pageable pageable);

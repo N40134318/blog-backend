@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import space.rainstorm.blogbackend.common.ApiResponse;
@@ -80,7 +81,9 @@ public class CommentController {
         if (!postRepository.existsById(postId)) {
             return new ApiResponse<>(404, "文章不存在", null);
         }
-        return ApiResponse.success(commentRepository.findByPostIdOrderByIdDesc(postId));
+
+        return ApiResponse.success(
+                commentRepository.findByPostIdAndStatusOrderByIdDesc(postId, "visible"));
     }
 
     @GetMapping("/api/admin/comments")
@@ -103,7 +106,7 @@ public class CommentController {
         if (keyword == null || keyword.isBlank()) {
             result = commentRepository.findAllByOrderByIdDesc(pageable);
         } else {
-            result = commentRepository.findByAuthorContainingOrContentContaining(
+            result = commentRepository.findByAuthorContainingOrContentContainingOrderByIdDesc(
                     keyword,
                     keyword,
                     pageable);
@@ -112,6 +115,7 @@ public class CommentController {
         List<AdminCommentItem> list = result.getContent().stream().map(comment -> {
             String postTitle = "文章不存在";
             Optional<Post> optionalPost = postRepository.findById(comment.getPostId());
+
             if (optionalPost.isPresent()) {
                 Post post = optionalPost.get();
                 postTitle = post.getTitle() == null || post.getTitle().isBlank()
@@ -125,7 +129,8 @@ public class CommentController {
                     postTitle,
                     comment.getAuthor(),
                     comment.getContent(),
-                    comment.getCreatedAt());
+                    comment.getCreatedAt(),
+                    comment.getStatus());
         }).collect(Collectors.toList());
 
         return ApiResponse.success(Map.of(
@@ -156,6 +161,53 @@ public class CommentController {
         comment.setAuthor(username);
         comment.setContent(request.getContent().trim());
         comment.setCreatedAt(System.currentTimeMillis());
+        comment.setStatus("visible");
+
+        return ApiResponse.success(commentRepository.save(comment));
+    }
+
+    @PutMapping("/api/admin/comments/{id}/hide")
+    public ApiResponse<Comment> hideComment(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+
+        if (!isAdmin(auth)) {
+            return new ApiResponse<>(403, "仅管理员可操作", null);
+        }
+
+        Optional<Comment> optionalComment = commentRepository.findById(id);
+        if (optionalComment.isEmpty()) {
+            return new ApiResponse<>(404, "评论不存在", null);
+        }
+
+        Comment comment = optionalComment.get();
+        comment.setStatus("hidden");
+
+        return ApiResponse.success(commentRepository.save(comment));
+    }
+
+    @PutMapping("/api/admin/comments/{id}/restore")
+    public ApiResponse<Comment> restoreComment(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+
+        if (!isAdmin(auth)) {
+            return new ApiResponse<>(403, "仅管理员可操作", null);
+        }
+
+        Optional<Comment> optionalComment = commentRepository.findById(id);
+        if (optionalComment.isEmpty()) {
+            return new ApiResponse<>(404, "评论不存在", null);
+        }
+
+        Comment comment = optionalComment.get();
+        comment.setStatus("visible");
 
         return ApiResponse.success(commentRepository.save(comment));
     }

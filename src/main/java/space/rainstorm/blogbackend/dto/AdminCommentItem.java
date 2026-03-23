@@ -8,6 +8,7 @@ public class AdminCommentItem {
     private String author;
     private String content;
     private Long createdAt;
+    private String status;
 
     public AdminCommentItem() {
     }
@@ -18,13 +19,15 @@ public class AdminCommentItem {
             String postTitle,
             String author,
             String content,
-            Long createdAt) {
+            Long createdAt,
+            String status) {
         this.id = id;
         this.postId = postId;
         this.postTitle = postTitle;
         this.author = author;
         this.content = content;
         this.createdAt = createdAt;
+        this.status = status;
     }
 
     public Long getId() {
@@ -73,5 +76,13 @@ public class AdminCommentItem {
 
     public void setCreatedAt(Long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

@@ -1,9 +1,6 @@
 package space.rainstorm.blogbackend.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 @Entity
 public class Comment {
@@ -13,19 +10,26 @@ public class Comment {
     private Long id;
 
     private Long postId;
+
     private String author;
+
     private String content;
+
     private Long createdAt;
+
+    @Column(nullable = false)
+    private String status = "visible";
 
     public Comment() {
     }
 
-    public Comment(Long id, Long postId, String author, String content, Long createdAt) {
+    public Comment(Long id, Long postId, String author, String content, Long createdAt, String status) {
         this.id = id;
         this.postId = postId;
         this.author = author;
         this.content = content;
         this.createdAt = createdAt;
+        this.status = status;
     }
 
     public Long getId() {
@@ -48,6 +52,10 @@ public class Comment {
         return createdAt;
     }
 
+    public String getStatus() {
+        return status;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -66,5 +74,9 @@ public class Comment {
 
     public void setCreatedAt(Long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

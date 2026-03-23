@@ -13,11 +13,12 @@ services:
     volumes:
       - blog_mysql_data:/var/lib/mysql
 
-  blog-backend-dev:
-    container_name: blog-backend-dev
+  backend:
+    image: blog-backend:dev
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: blog-backend-dev
     working_dir: /workspace
     command: ./mvnw spring-boot:run
     volumes:

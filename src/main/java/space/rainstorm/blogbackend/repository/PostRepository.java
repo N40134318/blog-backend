@@ -34,6 +34,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     long count();
 
+    Page<Post> findByStatusOrderByViewCountDescIdDesc(String status, Pageable pageable);
+
     @Modifying
     @Transactional
     @Query("UPDATE Post p SET p.viewCount = :viewCount WHERE p.id = :id")

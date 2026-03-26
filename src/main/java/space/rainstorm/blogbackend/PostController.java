@@ -174,18 +174,24 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "") String keyword) {
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "latest") String sort) {
         String safeKeyword = keyword == null ? "" : keyword.trim();
-        String cacheKey = "post:list:" + page + ":" + size + ":" + safeKeyword;
+        String safeSort = "hot".equalsIgnoreCase(sort) ? "hot" : "latest";
+        String cacheKey = "post:list:" + safeSort + ":" + page + ":" + size + ":" + safeKeyword;
 
         Object cached = cacheService.get(cacheKey);
         if (cached instanceof Map) {
             return ApiResponse.success((Map<String, Object>) cached);
         }
 
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        Page<Post> result;
+        Sort pageSort = "hot".equals(safeSort)
+                ? Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("id"))
+                : Sort.by(Sort.Direction.DESC, "id");
 
+        PageRequest pageable = PageRequest.of(page, size, pageSort);
+
+        Page<Post> result;
         if (safeKeyword.isBlank()) {
             result = postRepository.findByStatus("published", pageable);
         } else {
@@ -204,6 +210,20 @@ public class PostController {
 
         cacheService.set(cacheKey, data, DETAIL_CACHE_SECONDS);
         return ApiResponse.success(data);
+    }
+
+    @GetMapping("/api/posts/hot")
+    public ApiResponse<Map<String, Object>> hotPosts(
+            @RequestParam(defaultValue = "6") int size) {
+        int safeSize = Math.max(1, Math.min(size, 20));
+        PageRequest pageable = PageRequest.of(0, safeSize);
+        Page<Post> result = postRepository.findByStatusOrderByViewCountDescIdDesc("published", pageable);
+        return ApiResponse.success(Map.of(
+                "list", result.getContent(),
+                "page", result.getNumber(),
+                "size", result.getSize(),
+                "totalElements", result.getTotalElements(),
+                "totalPages", result.getTotalPages()));
     }
 
     @GetMapping("/api/posts/my")

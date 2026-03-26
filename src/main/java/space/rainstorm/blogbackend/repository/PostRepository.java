@@ -1,8 +1,12 @@
 package space.rainstorm.blogbackend.repository;
 
+import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import space.rainstorm.blogbackend.entity.Post;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
@@ -29,4 +33,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     long countByStatus(String status);
 
     long count();
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Post p SET p.viewCount = :viewCount WHERE p.id = :id")
+    int updateViewCountById(@Param("id") Long id, @Param("viewCount") Long viewCount);
 }

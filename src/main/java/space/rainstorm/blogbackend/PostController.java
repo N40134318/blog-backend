@@ -1,5 +1,6 @@
 package space.rainstorm.blogbackend;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,11 +24,19 @@ import space.rainstorm.blogbackend.repository.UserRepository;
 import space.rainstorm.blogbackend.util.JwtUtil;
 import space.rainstorm.blogbackend.util.RedisCacheService;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
 public class PostController {
+
+    private static final long DETAIL_CACHE_SECONDS = 300;
+    private static final long VIEW_COUNT_CACHE_SECONDS = 604800;
+    private static final long VIEW_DEDUP_SECONDS = 86400;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final RedisCacheService cacheService;
@@ -96,6 +105,69 @@ public class PostController {
         cacheService.deleteByPrefix("post:list:");
     }
 
+    private String getTodayText() {
+        return LocalDate.now().format(DATE_FORMATTER);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+
+        String remoteAddr = request.getRemoteAddr();
+        return remoteAddr == null || remoteAddr.isBlank() ? "unknown" : remoteAddr.trim();
+    }
+
+    private String buildViewDedupKey(Long postId, String auth, HttpServletRequest request) {
+        String today = getTodayText();
+
+        if (!isUnauthorized(auth)) {
+            String username = getCurrentUsername(auth);
+            return "post:view:dedup:user:" + postId + ":" + username + ":" + today;
+        }
+
+        String ip = getClientIp(request).replace(":", "_");
+        return "post:view:dedup:ip:" + postId + ":" + ip + ":" + today;
+    }
+
+    private long getCurrentPostViewCount(Post post) {
+        String viewKey = "post:view:" + post.getId();
+        String cachedValue = cacheService.getString(viewKey);
+        if (cachedValue != null && !cachedValue.isBlank()) {
+            try {
+                return Long.parseLong(cachedValue);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return post.getViewCount() == null ? 0L : post.getViewCount();
+    }
+
+    private long increasePostViewCount(Post post, String auth, HttpServletRequest request) {
+        String viewKey = "post:view:" + post.getId();
+        String dedupKey = buildViewDedupKey(post.getId(), auth, request);
+
+        if (!cacheService.hasKey(viewKey)) {
+            long base = post.getViewCount() == null ? 0L : post.getViewCount();
+            cacheService.setString(viewKey, String.valueOf(base), VIEW_COUNT_CACHE_SECONDS);
+        }
+
+        if (cacheService.hasKey(dedupKey)) {
+            return getCurrentPostViewCount(post);
+        }
+
+        cacheService.setString(dedupKey, "1", VIEW_DEDUP_SECONDS);
+
+        long current = cacheService.increment(viewKey, 1);
+        cacheService.expire(viewKey, VIEW_COUNT_CACHE_SECONDS);
+        return current;
+    }
+
     @GetMapping("/api/posts")
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> list(
@@ -103,7 +175,6 @@ public class PostController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "") String keyword) {
-
         String safeKeyword = keyword == null ? "" : keyword.trim();
         String cacheKey = "post:list:" + page + ":" + size + ":" + safeKeyword;
 
@@ -131,8 +202,7 @@ public class PostController {
                 "totalElements", result.getTotalElements(),
                 "totalPages", result.getTotalPages());
 
-        cacheService.set(cacheKey, data, 300);
-
+        cacheService.set(cacheKey, data, DETAIL_CACHE_SECONDS);
         return ApiResponse.success(data);
     }
 
@@ -176,7 +246,6 @@ public class PostController {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
-
         if (!isAdmin(auth)) {
             return new ApiResponse<>(403, "仅管理员可访问", null);
         }
@@ -207,7 +276,6 @@ public class PostController {
         if (isUnauthorized(auth)) {
             return new ApiResponse<>(401, "未登录", null);
         }
-
         if (!isAdmin(auth)) {
             return new ApiResponse<>(403, "仅管理员可访问", null);
         }
@@ -228,13 +296,18 @@ public class PostController {
     @GetMapping("/api/posts/{id}")
     public ApiResponse<Post> detail(
             @PathVariable Long id,
-            @RequestHeader(value = "Authorization", required = false) String auth) {
-
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            HttpServletRequest request) {
         String cacheKey = "post:detail:" + id;
 
         Object cached = cacheService.get(cacheKey);
         if (cached instanceof Post) {
-            return ApiResponse.success((Post) cached);
+            Post post = (Post) cached;
+            if ("published".equals(post.getStatus())) {
+                long currentViewCount = increasePostViewCount(post, auth, request);
+                post.setViewCount(currentViewCount);
+            }
+            return ApiResponse.success(post);
         }
 
         Optional<Post> optionalPost = postRepository.findById(id);
@@ -245,7 +318,9 @@ public class PostController {
         Post post = optionalPost.get();
 
         if ("published".equals(post.getStatus())) {
-            cacheService.set(cacheKey, post, 300);
+            long currentViewCount = increasePostViewCount(post, auth, request);
+            post.setViewCount(currentViewCount);
+            cacheService.set(cacheKey, post, DETAIL_CACHE_SECONDS);
             return ApiResponse.success(post);
         }
 
@@ -278,11 +353,10 @@ public class PostController {
         post.setStatus(normalizeStatus(request.getStatus()));
         post.setCreatedAt(now);
         post.setUpdatedAt(now);
+        post.setViewCount(0L);
 
         Post savedPost = postRepository.save(post);
-
         clearPublicPostListCache();
-
         return ApiResponse.success(savedPost);
     }
 
@@ -315,10 +389,8 @@ public class PostController {
         post.setUpdatedAt(System.currentTimeMillis());
 
         Post savedPost = postRepository.save(post);
-
         cacheService.delete("post:detail:" + savedPost.getId());
         clearPublicPostListCache();
-
         return ApiResponse.success(savedPost);
     }
 
@@ -345,10 +417,8 @@ public class PostController {
         post.setUpdatedAt(System.currentTimeMillis());
 
         Post savedPost = postRepository.save(post);
-
         cacheService.delete("post:detail:" + savedPost.getId());
         clearPublicPostListCache();
-
         return ApiResponse.success(savedPost);
     }
 
@@ -371,8 +441,10 @@ public class PostController {
         }
 
         postRepository.deleteById(id);
-
         cacheService.delete("post:detail:" + id);
+        cacheService.delete("post:view:" + id);
+        cacheService.deleteByPrefix("post:view:dedup:user:" + id + ":");
+        cacheService.deleteByPrefix("post:view:dedup:ip:" + id + ":");
         clearPublicPostListCache();
 
         return ApiResponse.success("删除成功");

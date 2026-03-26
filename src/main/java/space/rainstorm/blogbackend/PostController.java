@@ -101,6 +101,19 @@ public class PostController {
         return value == null ? null : value.trim();
     }
 
+    private Integer normalizeWeight(Integer weight) {
+        if (weight == null) {
+            return 0;
+        }
+        if (weight > 10000) {
+            return 10000;
+        }
+        if (weight < -10000) {
+            return -10000;
+        }
+        return weight;
+    }
+
     private void clearPublicPostListCache() {
         cacheService.deleteByPrefix("post:list:");
     }
@@ -186,8 +199,13 @@ public class PostController {
         }
 
         Sort pageSort = "hot".equals(safeSort)
-                ? Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("id"))
-                : Sort.by(Sort.Direction.DESC, "id");
+                ? Sort.by(
+                        Sort.Order.desc("weight"),
+                        Sort.Order.desc("viewCount"),
+                        Sort.Order.desc("id"))
+                : Sort.by(
+                        Sort.Order.desc("weight"),
+                        Sort.Order.desc("id"));
 
         PageRequest pageable = PageRequest.of(page, size, pageSort);
 
@@ -217,7 +235,7 @@ public class PostController {
             @RequestParam(defaultValue = "6") int size) {
         int safeSize = Math.max(1, Math.min(size, 20));
         PageRequest pageable = PageRequest.of(0, safeSize);
-        Page<Post> result = postRepository.findByStatusOrderByViewCountDescIdDesc("published", pageable);
+        Page<Post> result = postRepository.findByStatusOrderByWeightDescViewCountDescIdDesc("published", pageable);
         return ApiResponse.success(Map.of(
                 "list", result.getContent(),
                 "page", result.getNumber(),
@@ -300,7 +318,10 @@ public class PostController {
             return new ApiResponse<>(403, "仅管理员可访问", null);
         }
 
-        PageRequest pageable = PageRequest.of(0, 6, Sort.by(Sort.Direction.DESC, "id"));
+        PageRequest pageable = PageRequest.of(
+                0,
+                6,
+                Sort.by(Sort.Order.desc("weight"), Sort.Order.desc("id")));
         Page<Post> recentPage = postRepository.findAll(pageable);
         long totalPosts = postRepository.count();
         long draftCount = postRepository.countByStatus("draft");
@@ -374,6 +395,7 @@ public class PostController {
         post.setCreatedAt(now);
         post.setUpdatedAt(now);
         post.setViewCount(0L);
+        post.setWeight(0);
 
         Post savedPost = postRepository.save(post);
         clearPublicPostListCache();
@@ -439,6 +461,35 @@ public class PostController {
         Post savedPost = postRepository.save(post);
         cacheService.delete("post:detail:" + savedPost.getId());
         clearPublicPostListCache();
+        return ApiResponse.success(savedPost);
+    }
+
+    @PutMapping("/api/posts/{id}/weight")
+    public ApiResponse<Post> updateWeight(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestParam Integer weight) {
+        if (isUnauthorized(auth)) {
+            return new ApiResponse<>(401, "未登录", null);
+        }
+        if (!isAdmin(auth)) {
+            return new ApiResponse<>(403, "仅管理员可修改文章权重", null);
+        }
+
+        Optional<Post> optionalPost = postRepository.findById(id);
+        if (optionalPost.isEmpty()) {
+            return new ApiResponse<>(404, "文章不存在", null);
+        }
+
+        Post post = optionalPost.get();
+        post.setWeight(normalizeWeight(weight));
+        post.setUpdatedAt(System.currentTimeMillis());
+
+        Post savedPost = postRepository.save(post);
+
+        cacheService.delete("post:detail:" + savedPost.getId());
+        clearPublicPostListCache();
+
         return ApiResponse.success(savedPost);
     }
 

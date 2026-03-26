@@ -28,6 +28,7 @@ public class Post {
     private Long createdAt;
     private Long updatedAt;
     private Long viewCount;
+    private Integer weight;
 
     public Post() {
     }
@@ -44,7 +45,8 @@ public class Post {
             String status,
             Long createdAt,
             Long updatedAt,
-            Long viewCount) {
+            Long viewCount,
+            Integer weight) {
         this.id = id;
         this.title = title;
         this.summary = summary;
@@ -57,6 +59,7 @@ public class Post {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.viewCount = viewCount;
+        this.weight = weight;
     }
 
     public Long getId() {
@@ -153,5 +156,13 @@ public class Post {
 
     public void setViewCount(Long viewCount) {
         this.viewCount = viewCount;
+    }
+
+    public Integer getWeight() {
+        return weight;
+    }
+
+    public void setWeight(Integer weight) {
+        this.weight = weight;
     }
 }

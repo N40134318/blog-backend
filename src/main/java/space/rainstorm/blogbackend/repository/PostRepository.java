@@ -30,14 +30,19 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             String status2, String contentKeyword,
             Pageable pageable);
 
+    Page<Post> findByStatusOrderByWeightDescViewCountDescIdDesc(String status, Pageable pageable);
+
     long countByStatus(String status);
 
     long count();
-
-    Page<Post> findByStatusOrderByViewCountDescIdDesc(String status, Pageable pageable);
 
     @Modifying
     @Transactional
     @Query("UPDATE Post p SET p.viewCount = :viewCount WHERE p.id = :id")
     int updateViewCountById(@Param("id") Long id, @Param("viewCount") Long viewCount);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Post p SET p.weight = :weight WHERE p.id = :id")
+    int updateWeightById(@Param("id") Long id, @Param("weight") Integer weight);
 }

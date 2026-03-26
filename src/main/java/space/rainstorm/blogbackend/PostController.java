@@ -395,7 +395,7 @@ public class PostController {
         post.setCreatedAt(now);
         post.setUpdatedAt(now);
         post.setViewCount(0L);
-        post.setWeight(0);
+        post.setWeight(normalizeWeight(request.getWeight()));
 
         Post savedPost = postRepository.save(post);
         clearPublicPostListCache();
@@ -428,6 +428,7 @@ public class PostController {
         post.setTags(normalizeText(request.getTags()));
         post.setCoverImage(normalizeText(request.getCoverImage()));
         post.setStatus(normalizeStatus(request.getStatus()));
+        post.setWeight(normalizeWeight(request.getWeight()));
         post.setUpdatedAt(System.currentTimeMillis());
 
         Post savedPost = postRepository.save(post);

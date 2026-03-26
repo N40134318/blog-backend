@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public class CreatePostRequest {
-
     @NotBlank(message = "文章标题不能为空")
     @Size(min = 1, max = 100, message = "文章标题长度需在 1 到 100 个字符之间")
     private String title;
@@ -24,6 +23,8 @@ public class CreatePostRequest {
 
     @Size(max = 20, message = "状态值长度不能超过 20 个字符")
     private String status;
+
+    private Integer weight;
 
     public CreatePostRequest() {
     }
@@ -74,5 +75,13 @@ public class CreatePostRequest {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Integer getWeight() {
+        return weight;
+    }
+
+    public void setWeight(Integer weight) {
+        this.weight = weight;
     }
 }

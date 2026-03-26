@@ -288,7 +288,12 @@ public class PostController {
             return new ApiResponse<>(403, "仅管理员可访问", null);
         }
 
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.desc("weight"),
+                        Sort.Order.desc("id")));
         Page<Post> result;
 
         if (keyword == null || keyword.isBlank()) {
